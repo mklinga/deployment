@@ -1,0 +1,130 @@
+---
+
+- name: Create necessary directories
+  file:
+    path: "{{ item }}"
+    mode: 0755
+    state: directory
+  with_items:
+    - "/suspicious/ghost"
+    - "/suspicious/data"
+
+- name: Create theme directory
+  file:
+    path: "/suspicious/theme"
+    mode: 0755
+    owner: "{{ theme_deploy_user }}"
+    state: directory
+  when: update_theme_from_git
+
+- name: Copy ghost files to /suspicious/ghost
+  copy:
+    src: "{{ item }}"
+    dest: "/suspicious/ghost/{{ item }}"
+  with_items:
+    - "Dockerfile"
+    - "start.bash"
+
+- name: Build Ghost container
+  shell: docker build --no-cache -t ghost .
+  args:
+    chdir: /suspicious/ghost
+
+- name: Copy the data to the server
+  copy:
+    src: "ghost-data.tar.bz2"
+    dest: "/suspicious/ghost-data.tar.bz2"
+  when: initialize_content_from_file
+
+- name: Extract the ghost data
+  shell: tar xjf /suspicious/ghost-data.tar.bz2 -C /suspicious/data
+  when: initialize_content_from_file
+
+- name: Build Data Volume Container
+  docker:
+    image: busybox
+    name: GHOSTDATA
+    volumes:
+      - "/ghost-override"
+    command: "/bin/sh"
+
+- name: Clear the existing data
+  docker:
+    image: busybox
+    command: "/bin/sh -c 'rm /ghost-override/*'"
+    volumes_from: GHOSTDATA
+    state: running
+  when: initialize_content_from_file
+
+- name: Replace the data
+  docker:
+    image: busybox
+    command: "/bin/sh -c 'cp -r /suspicious-data/* /ghost-override'"
+    volumes:
+      - "/suspicious/data:/suspicious-data"
+    volumes_from: GHOSTDATA
+    state: running
+  when: initialize_content_from_file
+
+- name: Clone the theme repository
+  git:
+    accept_hostkey: yes
+    dest: "/suspicious/theme"
+    repo: "git@github.com:laite/suspicious-theme.git"
+  sudo_user: "{{ theme_deploy_user }}"
+  when: update_theme_from_git
+
+- name: Make sure npm sources are set
+  shell: "curl -sL https://deb.nodesource.com/setup | sudo bash -"
+  when: update_theme_from_git
+
+- name: Install npm
+  apt:
+    pkg: nodejs
+    state: installed
+
+- name: Install theme dependencies
+  shell: npm install
+  args:
+    chdir: /suspicious/theme
+  when: update_theme_from_git
+
+- name: Compile SASS files
+  shell: ./node_modules/gulp/bin/gulp.js sass
+  args:
+    chdir: /suspicious/theme
+  when: update_theme_from_git
+
+- name: Clear the existing theme
+  docker:
+    image: busybox
+    command: "/bin/sh -c 'rm -rf /ghost-override/content/themes/suspicious-theme'"
+    volumes_from: GHOSTDATA
+    state: running
+  when: update_theme_from_git
+
+- name: Replace the data
+  docker:
+    image: busybox
+    command: "/bin/sh -c 'cp -r /suspicious-theme /ghost-override/content/themes'"
+    volumes:
+      - "/suspicious/theme:/suspicious-theme"
+    volumes_from: GHOSTDATA
+    state: running
+  when: update_theme_from_git
+
+- name: Stop and remove existing container
+  command: "{{ item }}"
+  ignore_errors: yes
+  with_items:
+    - "docker stop suspicious_website"
+    - "docker rm suspicious_website"
+
+- name: Make sure that Ghost is running in the end
+  docker:
+    image: ghost
+    name: suspicious_website
+    ports: 2368:2368
+    state: running
+    volumes_from: GHOSTDATA
+

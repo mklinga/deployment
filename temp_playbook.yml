@@ -1,0 +1,15 @@
+---
+- hosts: all
+
+  sudo: True
+
+  vars:
+    system_packages:
+      - git
+      - bzip2
+
+  roles:
+    - { role: common }
+    - { role: docker }
+    - { role: suspicious, theme_deploy_user: "ghost" }
+

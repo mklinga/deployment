@@ -1,0 +1,5 @@
+---
+
+- name: Install system packages
+  action: apt pkg={{ item }} state=installed update_cache=true
+  with_items: system_packages

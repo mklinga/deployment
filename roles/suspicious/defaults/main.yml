@@ -1,0 +1,11 @@
+---
+# Be very careful with this! It overwrites everything.
+initialize_content_from_file: false
+
+# Clone the master from github.com/laite/suspicious-theme
+update_theme_from_git: true
+
+# You should propably restart ghost on upgrades
+# or if the theme has new templates
+restart_ghost: true
+
