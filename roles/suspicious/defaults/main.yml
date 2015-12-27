@@ -3,7 +3,7 @@
 initialize_content_from_file: false
 
 # Clone the master from github.com/laite/suspicious-theme
-update_theme_from_git: true
+update_theme_from_git: false
 
 # You should propably restart ghost on upgrades
 # or if the theme has new templates

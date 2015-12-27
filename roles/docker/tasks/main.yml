@@ -28,6 +28,9 @@
     - python-dev
     - python-pip
 
+- name: Upgrade pip
+  shell: easy_install -U pip
+
 - name: Install Docker-py
   pip:
     name: docker-py
